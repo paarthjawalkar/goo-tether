@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>goo-tether — liquid magnet</title>
+<style>
+  :root { --ink: #161616; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #f4f3f1;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overscroll-behavior: none; touch-action: none;
+  }
+  .pill {
+    left: 50%; top: 42%;
+    position: fixed;
+    transform: translate(-50%,-50%);
+    padding: 26px 44px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #3c3c3c 0%, #101010 45%, #000 100%);
+    color: #fff;
+    font-size: clamp(22px, 5vw, 34px);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    box-shadow:
+      inset 0 2px 3px rgba(255,255,255,.35),
+      inset 0 -6px 12px rgba(0,0,0,.55),
+      0 18px 40px rgba(0,0,0,.28);
+    z-index: 2;
+  }
+  .pill::after { /* glossy top highlight */
+    content: "";
+    position: absolute;
+    left: 8%; right: 8%; top: 8%;
+    height: 38%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255,255,255,.38), rgba(255,255,255,0));
+    pointer-events: none;
+  }
+  .hint {
+    position: fixed; left: 18px; bottom: 16px;
+    color: #9b9894; font-size: 14px; z-index: 3;
+  }
+  .toolbar {
+    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center;
+    background: #fff; border: 1px solid #e6e4e1; border-radius: 12px;
+    padding: 8px 12px; box-shadow: 0 6px 18px rgba(0,0,0,.08); z-index: 3;
+  }
+  .toolbar input {
+    border: none; outline: none; font-size: 15px; width: 150px; color: var(--ink);
+  }
+  .brand {
+    position: fixed; right: 18px; bottom: 16px;
+    color: #c9c6c2; font-size: 13px; z-index: 3;
+  }
+  #hand {
+    position: fixed; left: 0; top: 0; width: 72px; height: 72px;
+    pointer-events: none; z-index: 5; display: none;
+    transform-origin: 30% 20%;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+  }
+</style>
+</head>
+<body>
+
+<button class="pill" id="pill">let&#8217;s collaborate</button>
+
+<!-- Original cartoon cursor-hand, drawn from primitive shapes (no copied assets). -->
+<svg id="hand" viewBox="0 0 72 72" aria-hidden="true">
+  <g fill="#ffffff" stroke="#161616" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- index finger -->
+    <rect x="24" y="4" width="13" height="34" rx="6.5"/>
+    <!-- palm -->
+    <path d="M20 34 h32 a4 4 0 0 1 4 4 v10 a16 16 0 0 1 -16 16 h-4 a16 16 0 0 1 -16 -16 z"/>
+    <!-- middle / ring / pinky knuckles -->
+    <path d="M37 34 v-6 a6 6 0 0 1 12 0 v6" fill="#ffffff"/>
+    <path d="M49 34 v-4 a5.5 5.5 0 0 1 11 0 v8"/>
+    <!-- thumb -->
+    <path d="M20 40 c-6 -2 -10 2 -9 7 c1 5 6 9 11 10"/>
+  </g>
+</svg>
+
+<div class="hint">bring your finger close.</div>
+<div class="toolbar">
+  <span style="color:#9b9894;font-size:13px;">label</span>
+  <input id="labelInput" value="let's collaborate" maxlength="40" aria-label="button label">
+</div>
+<div class="brand">goo-tether &middot; MIT</div>
+
+<script src="goo-tether.js"></script>
+<script>
+(function () {
+  var pill = document.getElementById('pill');
+  var hand = document.getElementById('hand');
+  var input = document.getElementById('labelInput');
+  var attract = true;
+
+  var tether = new GooTether({
+    color: '#0d0d0d',
+    range: Math.min(300, Math.max(180, Math.min(innerWidth, innerHeight) * 0.5)),
+    onFrame: function (pt, active) {
+      if (active) {
+        hand.style.display = 'block';
+        hand.style.transform = 'translate3d(' + (pt.x - 30) + 'px,' + (pt.y - 4) + 'px,0)';
+      } else hand.style.display = 'none';
+    }
+  });
+  tether.attach(pill);
+  window.__gooTether = tether; // debug handle
+
+  input.addEventListener('input', function () {
+    pill.textContent = input.value || 'let\u2019s collaborate';
+    setTimeout(function () { tether._measure(); }, 0);
+  });
+
+  // attract mode: a virtual finger circles the button until a real pointer shows up
+  function real() { attract = false; }
+  window.addEventListener('pointerdown', real, { once: true });
+  window.addEventListener('pointermove', function (e) { if (e.isTrusted) attract = false; }, { once: true });
+  var start = null;
+  function loop(ts) {
+    if (!attract) return;
+    if (!start) start = ts;
+    var t = (ts - start) / 1000, r = tether.rect;
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var ph = t % 7;
+    if (ph < 5.2) {
+      var a = t * 0.9, rx = r.width * 0.5 + 70, ry = r.height * 0.5 + 90;
+      tether.setPointer(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry);
+    } else tether.clearPointer();
+    requestAnimationFrame(loop);
+  }
+  if (!new URLSearchParams(location.search).get('still')) requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
